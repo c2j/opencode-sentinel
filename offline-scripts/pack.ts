@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename)
 const PROJECT_ROOT = path.resolve(__dirname, "..")
 const DIST_DIR = path.join(__dirname, "temp_build")
 const BUNDLE_DIR = path.join(DIST_DIR, "content")
-const NODE_VERSION = "v20.11.0"
+const NODE_VERSION = "v22.14.0"
 const NODE_BASE_URL = `https://nodejs.org/dist/${NODE_VERSION}`
 
 const NODES = [
@@ -23,6 +23,50 @@ const NODES = [
     arch: "arm64",
     ext: "tar.gz",
     url: `${NODE_BASE_URL}/node-${NODE_VERSION}-darwin-arm64.tar.gz`,
+  },
+]
+
+// MCP packages for offline use (list-based management)
+const MCP_PACKAGES = ["@playwright/mcp"]
+
+// Miniforge (Python 3.12) configuration
+const MINIFORGE_VERSION = "25.11.0-1"
+const MINIFORGE_BASE_URL = "https://github.com/conda-forge/miniforge/releases/latest/download"
+const MINIFORGE = [
+  {
+    platform: "linux",
+    arch: "x64",
+    ext: "sh",
+    url: `${MINIFORGE_BASE_URL}/Miniforge3-${MINIFORGE_VERSION}-Linux-x86_64.sh`,
+    name: `Miniforge3-${MINIFORGE_VERSION}-Linux-x86_64.sh`,
+  },
+  {
+    platform: "linux",
+    arch: "arm64",
+    ext: "sh",
+    url: `${MINIFORGE_BASE_URL}/Miniforge3-${MINIFORGE_VERSION}-Linux-aarch64.sh`,
+    name: `Miniforge3-${MINIFORGE_VERSION}-Linux-aarch64.sh`,
+  },
+  {
+    platform: "darwin",
+    arch: "x64",
+    ext: "sh",
+    url: `${MINIFORGE_BASE_URL}/Miniforge3-${MINIFORGE_VERSION}-MacOSX-x86_64.sh`,
+    name: `Miniforge3-${MINIFORGE_VERSION}-MacOSX-x86_64.sh`,
+  },
+  {
+    platform: "darwin",
+    arch: "arm64",
+    ext: "sh",
+    url: `${MINIFORGE_BASE_URL}/Miniforge3-${MINIFORGE_VERSION}-MacOSX-arm64.sh`,
+    name: `Miniforge3-${MINIFORGE_VERSION}-MacOSX-arm64.sh`,
+  },
+  {
+    platform: "win32",
+    arch: "x64",
+    ext: "exe",
+    url: `${MINIFORGE_BASE_URL}/Miniforge3-${MINIFORGE_VERSION}-Windows-x86_64.exe`,
+    name: `Miniforge3-${MINIFORGE_VERSION}-Windows-x86_64.exe`,
   },
 ]
 
@@ -101,6 +145,18 @@ async function main() {
     }),
   )
 
+  // 3.1 Download Miniforge (Python 3.12)
+  console.log("Downloading Miniforge (Python 3.12)...")
+  fs.mkdirSync(path.join(BUNDLE_DIR, "python"), { recursive: true })
+  const currentOS = process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux"
+  const currentArch = process.arch === "arm64" ? "arm64" : "x64"
+  const miniforgePkg = MINIFORGE.find((m) => m.platform === currentOS && m.arch === currentArch)
+  if (miniforgePkg) {
+    await downloadFile(miniforgePkg.url, path.join(BUNDLE_DIR, "python", miniforgePkg.name))
+  } else {
+    console.log("Warning: No Miniforge package found for current platform, skipping...")
+  }
+
   // 4. Prepare Dependencies
   console.log("Installing dependencies...")
   const depsPkg = {
@@ -108,6 +164,7 @@ async function main() {
       "@opencode-ai/plugin": "1.1.36",
       "@openauthjs/openauth": "0.0.0-20250322224806",
       "@gitlab/opencode-gitlab-auth": "1.3.3",
+      ...Object.fromEntries(MCP_PACKAGES.map((pkg) => [pkg, "latest"])),
     },
   }
   fs.writeFileSync(path.join(BUNDLE_DIR, "deps", "package.json"), JSON.stringify(depsPkg, null, 2))
@@ -118,6 +175,18 @@ async function main() {
   // Install deps using npm (so we get a standard node_modules)
   // Use --userconfig to ignore the user's ~/.npmrc which might have invalid proxy settings
   await $`cd ${path.join(BUNDLE_DIR, "deps")} && npm --userconfig=.npmrc install --no-bin-links --ignore-scripts --no-audit --no-fund --omit=dev`
+
+  if (MCP_PACKAGES.some(p => p.includes("playwright"))) {
+    console.log("Installing Playwright browsers...")
+    const depsDir = path.join(BUNDLE_DIR, "deps")
+    try {
+      await $`cd ${depsDir} && npx --yes playwright install --with-deps chromium firefox webkit`.cwd(PROJECT_ROOT)
+      console.log("Playwright browsers installed.")
+    } catch (e) {
+      console.warn("Warning: Failed to install Playwright browsers:", e)
+    }
+  }
+  }
 
   // 5. Copy Install Scripts (We will create them next)
   // Assuming they exist in offline-scripts/

@@ -62,7 +62,7 @@ else
       mkdir -p "$TEMP_NODE"
       tar -xf "$NODE_ARCHIVE" -C "$TEMP_NODE"
       # Move contents to $INSTALL_DIR/node (standardizing structure)
-      # We assume the tarball contains a single root folder like node-v20.11.0-linux-x64
+      # We assume the tarball contains a single root folder like node-v22.14.0-linux-x64
       EXTRACTED_DIR=$(find "$TEMP_NODE" -maxdepth 1 -type d -name "node-v*" | head -n 1)
       if [ -n "$EXTRACTED_DIR" ]; then
           # Move contents of extracted dir to INSTALL_DIR/node (overwriting/merging)
@@ -70,6 +70,25 @@ else
           rm -rf "$TEMP_NODE"
       fi
   fi
+fi
+
+# 2.1 Setup Python (Miniforge)
+echo "Setting up Python (Miniforge)..."
+MINIFORGE_INSTALLER=""
+if [ "$TARGET_OS" = "linux" ]; then
+  MINIFORGE_INSTALLER=$(find "$INSTALL_DIR/python" -name "Miniforge3-*-Linux-*.sh" | head -n 1)
+elif [ "$TARGET_OS" = "darwin" ]; then
+  MINIFORGE_INSTALLER=$(find "$INSTALL_DIR/python" -name "Miniforge3-*-MacOSX-*.sh" | head -n 1)
+fi
+
+if [ -n "$MINIFORGE_INSTALLER" ]; then
+  echo "Installing Miniforge from $MINIFORGE_INSTALLER..."
+  chmod +x "$MINIFORGE_INSTALLER"
+  # Install to a local directory (not affecting system conda)
+  "$MINIFORGE_INSTALLER" -b -p "$INSTALL_DIR/python/conda"
+  echo "Miniforge installed to $INSTALL_DIR/python/conda"
+else
+  echo "Warning: Miniforge installer not found. Python will not be available."
 fi
 
 # 3. Setup Cache
@@ -90,13 +109,26 @@ echo "Installing plugins to cache..."
 rm -rf "$CACHE_DIR/node_modules"
 cp -r "$INSTALL_DIR/deps/node_modules" "$CACHE_DIR/"
 
-# Setup Config Directory (Duplicate dependencies here to prevent sticking)
+# Setup Config Directory
 echo "Config Directory: $CONFIG_DIR"
 mkdir -p "$CONFIG_DIR"
 cp "$INSTALL_DIR/deps/package.json" "$CONFIG_DIR/"
 echo "Installing plugins to config dir..."
 rm -rf "$CONFIG_DIR/node_modules"
 cp -r "$INSTALL_DIR/deps/node_modules" "$CONFIG_DIR/"
+
+# Setup Playwright browsers
+if [ -d "$INSTALL_DIR/deps/node_modules/playwright" ]; then
+  echo "Setting up Playwright browsers..."
+  PLAYWRIGHT_BROWSERS="$HOME/.cache/ms-playwright"
+  mkdir -p "$PLAYWRIGHT_BROWSERS"
+  if [ -d "$INSTALL_DIR/deps/node_modules/playwright/.local-browsers" ]; then
+    cp -r "$INSTALL_DIR/deps/node_modules/playwright/.local-browsers" "$PLAYWRIGHT_BROWSERS/"
+    echo "Playwright browsers copied to $PLAYWRIGHT_BROWSERS"
+  else
+    echo "Warning: Playwright browsers not found in package."
+  fi
+fi
 
 # 4. Setup Environment Variables
 echo "Setting up Environment Variables..."
@@ -124,9 +156,10 @@ if [ -n "$SHELL_CONFIG" ]; then
   # Add new entries
   echo "" >> "$SHELL_CONFIG"
   echo "# Opencode Path" >> "$SHELL_CONFIG"
-  echo "export PATH=\"$INSTALL_DIR/node/bin:$INSTALL_DIR/bin:\$PATH\"" >> "$SHELL_CONFIG"
+  PYTHON_PATH="$INSTALL_DIR/python/conda/bin"
+  echo "export PATH=\"$PYTHON_PATH:$INSTALL_DIR/node/bin:$INSTALL_DIR/bin:\$PATH\"" >> "$SHELL_CONFIG"
 
-  echo "Added Opencode and Node.js to PATH in $SHELL_CONFIG"
+  echo "Added Opencode, Node.js and Python to PATH in $SHELL_CONFIG"
   echo "Please run 'source $SHELL_CONFIG' or restart your terminal to apply changes."
 fi
 

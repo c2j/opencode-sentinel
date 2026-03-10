@@ -47,6 +47,20 @@ if ($NodeZip) {
     Write-Warning "Node.js archive not found. Opencode might not work correctly."
 }
 
+# 2.1 Setup Python (Miniforge)
+Write-Host "Setting up Python (Miniforge)..."
+$MiniforgeInstaller = Get-ChildItem "$InstallDir\python\Miniforge3-*-Windows-x86_64.exe" | Select-Object -First 1
+
+if ($MiniforgeInstaller) {
+    Write-Host "Installing Miniforge from $($MiniforgeInstaller.Name)..."
+    # Install silently to local directory
+    $PythonDir = Join-Path $InstallDir "python\conda"
+    Start-Process -FilePath $MiniforgeInstaller.FullName -ArgumentList "/S", "/D=$PythonDir" -Wait
+    Write-Host "Miniforge installed to $PythonDir"
+} else {
+    Write-Warning "Miniforge installer not found. Python will not be available."
+}
+
 # 3. Setup Cache and Config
 Write-Host "Setting up Cache and Config..."
 
@@ -82,14 +96,36 @@ if (Test-Path $DestConfigNodeModules) {
 }
 Copy-Item (Join-Path $InstallDir "deps\node_modules") $ConfigDir -Recurse -Force
 
+# Setup Playwright browsers
+$PlaywrightModule = Join-Path $InstallDir "deps\node_modules\playwright"
+if (Test-Path $PlaywrightModule) {
+    Write-Host "Setting up Playwright browsers..."
+    $PlaywrightBrowsers = Join-Path $env:LOCALAPPDATA "ms-playwright"
+    if (-not (Test-Path $PlaywrightBrowsers)) {
+        New-Item -ItemType Directory -Path $PlaywrightBrowsers -Force | Out-Null
+    }
+    $LocalBrowsers = Join-Path $PlaywrightModule ".local-browsers"
+    if (Test-Path $LocalBrowsers) {
+        Copy-Item "$LocalBrowsers\*" $PlaywrightBrowsers -Recurse -Force
+        Write-Host "Playwright browsers copied to $PlaywrightBrowsers"
+    } else {
+        Write-Warning "Playwright browsers not found in package."
+    }
+}
+
 # 4. Setup Environment Variables (User Level)
 Write-Host "Setting up Environment Variables..."
 $NodePath = Join-Path $InstallDir "node"
 $BinPath = Join-Path $InstallDir "bin"
+$PythonPath = Join-Path $InstallDir "python\conda"
 
 $CurrentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 $NewPath = $CurrentPath
 
+# Add Python path if not present
+if ($CurrentPath -notlike "*$PythonPath*" -and (Test-Path $PythonPath)) {
+    $NewPath = "$PythonPath;$NewPath"
+}
 # Add Node path if not present
 if ($CurrentPath -notlike "*$NodePath*") {
     $NewPath = "$NodePath;$NewPath"
@@ -101,7 +137,7 @@ if ($CurrentPath -notlike "*$BinPath*") {
 
 if ($NewPath -ne $CurrentPath) {
     [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
-    Write-Host "Added Opencode and Node.js to User Path."
+    Write-Host "Added Opencode, Node.js and Python to User Path."
     Write-Host "Please restart your terminal (or log off and on) to apply changes."
 } else {
     Write-Host "Path already configured."
@@ -109,3 +145,4 @@ if ($NewPath -ne $CurrentPath) {
 
 Write-Host ""
 Write-Host "--- Installation Complete ---"
+Write-Host "You can run Opencode using: $BinName"
