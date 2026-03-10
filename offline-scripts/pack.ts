@@ -44,7 +44,7 @@ const IS_ALL = TARGET === "all" || TARGET === null
 function getTargetOS(): string {
   if (!IS_ALL && TARGET) {
     const parts = TARGET.split("-")
-    return parts[0] || process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux"
+    if (parts[0]) return parts[0]
   }
   return process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux"
 }
@@ -52,7 +52,7 @@ function getTargetOS(): string {
 function getTargetArch(): string {
   if (!IS_ALL && TARGET) {
     const parts = TARGET.split("-")
-    return parts[1] || process.arch === "arm64" ? "arm64" : "x64"
+    if (parts[1]) return parts[1]
   }
   return process.arch === "arm64" ? "arm64" : "x64"
 }
