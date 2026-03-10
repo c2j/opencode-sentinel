@@ -151,16 +151,17 @@ async function main() {
   fs.mkdirSync(path.join(BUNDLE_DIR, "node"), { recursive: true })
   fs.mkdirSync(path.join(BUNDLE_DIR, "deps"), { recursive: true })
 
-  // 2. Build Opencode (All Platforms)
-  console.log("Building Opencode for all platforms...")
+  // 2. Build Opencode
+  const buildTargetMsg = IS_ALL ? "all platforms" : `${getTargetOS()}-${getTargetArch()}`
+  console.log(`Building Opencode for ${buildTargetMsg}...`)
   const buildScript = path.join(PROJECT_ROOT, "packages", "opencode", "script", "build.ts")
   if (!fs.existsSync(buildScript)) {
     throw new Error(`Build script not found at: ${buildScript}`)
   }
 
-  // We run the build script. Note: This might take a while.
-  // Use 'bun' directly on the file path, not 'bun run' (which looks for package.json scripts)
-  await $`bun ${buildScript}`.cwd(PROJECT_ROOT)
+  // Use --single to build only for current platform (faster for single-target builds)
+  const buildCmd = IS_ALL ? `bun ${buildScript}` : `bun ${buildScript} --single`
+  await $`${buildCmd}`.cwd(PROJECT_ROOT)
 
   // Copy binaries
   console.log("Copying binaries...")
