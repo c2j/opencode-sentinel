@@ -176,7 +176,7 @@ async function main() {
   // Use --userconfig to ignore the user's ~/.npmrc which might have invalid proxy settings
   await $`cd ${path.join(BUNDLE_DIR, "deps")} && npm --userconfig=.npmrc install --no-bin-links --ignore-scripts --no-audit --no-fund --omit=dev`
 
-  if (MCP_PACKAGES.some(p => p.includes("playwright"))) {
+  if (MCP_PACKAGES.some((p) => p.includes("playwright"))) {
     console.log("Installing Playwright browsers...")
     const depsDir = path.join(BUNDLE_DIR, "deps")
     try {
@@ -185,7 +185,6 @@ async function main() {
     } catch (e) {
       console.warn("Warning: Failed to install Playwright browsers:", e)
     }
-  }
   }
 
   // 5. Copy Install Scripts (We will create them next)
