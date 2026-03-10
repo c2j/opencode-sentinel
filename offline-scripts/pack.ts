@@ -159,9 +159,11 @@ async function main() {
     throw new Error(`Build script not found at: ${buildScript}`)
   }
 
-  // Use --single to build only for current platform (faster for single-target builds)
-  const buildCmd = IS_ALL ? `bun ${buildScript}` : `bun ${buildScript} --single`
-  await $`${buildCmd}`.cwd(PROJECT_ROOT)
+  if (IS_ALL) {
+    await $`bun ${buildScript}`.cwd(PROJECT_ROOT)
+  } else {
+    await $`bun ${buildScript} --single`.cwd(PROJECT_ROOT)
+  }
 
   // Copy binaries
   console.log("Copying binaries...")
