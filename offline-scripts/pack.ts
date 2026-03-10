@@ -159,11 +159,7 @@ async function main() {
     throw new Error(`Build script not found at: ${buildScript}`)
   }
 
-  if (IS_ALL) {
-    await $`bun ${buildScript}`.cwd(PROJECT_ROOT)
-  } else {
-    await $`bun ${buildScript} --single`.cwd(PROJECT_ROOT)
-  }
+  await $`bun ${buildScript}`.cwd(PROJECT_ROOT)
 
   // Copy binaries
   console.log("Copying binaries...")
