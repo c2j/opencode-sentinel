@@ -239,11 +239,28 @@ async function main() {
   if (MCP_PACKAGES.some((p) => p.includes("playwright"))) {
     console.log("Installing Playwright browsers...")
     const depsDir = path.join(BUNDLE_DIR, "deps")
-    console.log(`Checking depsDir: ${depsDir}`)
-    console.log(`MCP_PACKAGES: ${MCP_PACKAGES.join(", ")}`)
+
     try {
-      await $`cd ${depsDir} && npx --yes playwright install --with-deps chromium firefox webkit`.cwd(PROJECT_ROOT)
-      console.log("Playwright browsers installed.")
+      await $`cd ${depsDir} && npx --yes playwright install chromium firefox webkit`.cwd(PROJECT_ROOT)
+
+      const cacheDir = path.join(process.env.HOME || "", "Library", "Caches", "ms-playwright")
+      const browsersSrc = path.join(cacheDir)
+      const browsersDest = path.join(depsDir, "node_modules", "playwright", ".local-browsers")
+
+      if (fs.existsSync(browsersSrc)) {
+        fs.mkdirSync(browsersDest, { recursive: true })
+        const items = fs.readdirSync(browsersSrc)
+        for (const item of items) {
+          if (item !== ".links") {
+            const src = path.join(browsersSrc, item)
+            const dest = path.join(browsersDest, item)
+            fs.cpSync(src, dest, { recursive: true })
+          }
+        }
+        console.log("Playwright browsers copied to package.")
+      } else {
+        console.log("Warning: Playwright cache not found, browsers may not be included.")
+      }
     } catch (e) {
       console.warn("Warning: Failed to install Playwright browsers:", e)
     }
