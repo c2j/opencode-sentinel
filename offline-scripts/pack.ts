@@ -30,8 +30,8 @@ const NODES = [
 const MCP_PACKAGES = ["@playwright/mcp"]
 
 // Miniforge (Python 3.12) configuration
-const MINIFORGE_VERSION = "25.11.0-1"
-const MINIFORGE_BASE_URL = "https://github.com/conda-forge/miniforge/releases/latest/download"
+const MINIFORGE_VERSION = "26.1.0-0"
+const MINIFORGE_BASE_URL = `https://github.com/conda-forge/miniforge/releases/download/${MINIFORGE_VERSION}`
 const MINIFORGE = [
   {
     platform: "linux",
