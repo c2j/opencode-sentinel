@@ -239,12 +239,16 @@ async function main() {
   if (MCP_PACKAGES.some((p) => p.includes("playwright"))) {
     console.log("Installing Playwright browsers...")
     const depsDir = path.join(BUNDLE_DIR, "deps")
+    console.log(`Checking depsDir: ${depsDir}`)
+    console.log(`MCP_PACKAGES: ${MCP_PACKAGES.join(", ")}`)
     try {
       await $`cd ${depsDir} && npx --yes playwright install --with-deps chromium firefox webkit`.cwd(PROJECT_ROOT)
       console.log("Playwright browsers installed.")
     } catch (e) {
       console.warn("Warning: Failed to install Playwright browsers:", e)
     }
+  } else {
+    console.log("No Playwright MCP packages found, skipping browser installation.")
   }
 
   // 5. Copy Install Scripts (We will create them next)
