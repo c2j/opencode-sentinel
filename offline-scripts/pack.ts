@@ -13,6 +13,50 @@ const BUNDLE_DIR = path.join(DIST_DIR, "content")
 const NODE_VERSION = "v22.14.0"
 const NODE_BASE_URL = `https://nodejs.org/dist/${NODE_VERSION}`
 
+const args = process.argv.slice(2)
+let targetPlatform: string | null = null
+
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(`Usage: bun pack.ts [options]
+Options:
+  --target <platform>  Build for specific platform (e.g., darwin-arm64, linux-x64, win32-x64)
+  --target all         Build for all platforms (default)
+  --help, -h           Show this help message
+
+Examples:
+  bun pack.ts                      # Build for current platform
+  bun pack.ts --target darwin-arm64 # Build for macOS ARM64
+  bun pack.ts --target linux-x64    # Build for Linux x64
+  bun pack.ts --target all          # Build for all platforms`)
+  process.exit(0)
+}
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--target" && args[i + 1]) {
+    targetPlatform = args[i + 1] as string
+    break
+  }
+}
+
+const TARGET: string | null = targetPlatform
+const IS_ALL = TARGET === "all" || TARGET === null
+
+function getTargetOS(): string {
+  if (!IS_ALL && TARGET) {
+    const parts = TARGET.split("-")
+    return parts[0] || process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux"
+  }
+  return process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux"
+}
+
+function getTargetArch(): string {
+  if (!IS_ALL && TARGET) {
+    const parts = TARGET.split("-")
+    return parts[1] || process.arch === "arm64" ? "arm64" : "x64"
+  }
+  return process.arch === "arm64" ? "arm64" : "x64"
+}
+
 const NODES = [
   { platform: "win32", arch: "x64", ext: "zip", url: `${NODE_BASE_URL}/node-${NODE_VERSION}-win-x64.zip` },
   { platform: "linux", arch: "x64", ext: "tar.xz", url: `${NODE_BASE_URL}/node-${NODE_VERSION}-linux-x64.tar.xz` },
@@ -91,7 +135,11 @@ async function main() {
   }
 
   // Also remove the final zip/tar.gz if it exists to ensure a fresh build
-  const zipName = "opencode-offline.tar.gz"
+  const zipTargetOS = getTargetOS()
+  const zipTargetArch = getTargetArch()
+  const platformSuffix = IS_ALL ? "" : `-${zipTargetOS}-${zipTargetArch}`
+  const zipExt = zipTargetOS === "win32" ? ".zip" : ".tar.gz"
+  const zipName = `opencode-offline${platformSuffix}${zipExt}`
   const zipPath = path.join(__dirname, zipName)
   if (fs.existsSync(zipPath)) {
     console.log(`Removing existing ${zipName}...`)
@@ -120,7 +168,10 @@ async function main() {
   if (!fs.existsSync(distPath)) throw new Error("Build failed: dist folder not found")
 
   const targets = fs.readdirSync(distPath)
+  const currentOS = getTargetOS()
+  const currentArch = getTargetArch()
   for (const target of targets) {
+    if (!IS_ALL && !target.includes(currentOS)) continue
     const binPath = path.join(distPath, target, "bin")
     if (fs.existsSync(binPath)) {
       const files = fs.readdirSync(binPath)
@@ -139,8 +190,11 @@ async function main() {
 
   // 3. Download Node.js Binaries
   console.log("Downloading Node.js binaries...")
+  const targetOS = getTargetOS()
+  const targetArch = getTargetArch()
+  const filteredNodes = NODES.filter((n) => IS_ALL || (n.platform === targetOS && n.arch === targetArch))
   await Promise.all(
-    NODES.map((node) => {
+    filteredNodes.map((node) => {
       return downloadFile(node.url, path.join(BUNDLE_DIR, "node", path.basename(node.url)))
     }),
   )
@@ -148,9 +202,7 @@ async function main() {
   // 3.1 Download Miniforge (Python 3.12)
   console.log("Downloading Miniforge (Python 3.12)...")
   fs.mkdirSync(path.join(BUNDLE_DIR, "python"), { recursive: true })
-  const currentOS = process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux"
-  const currentArch = process.arch === "arm64" ? "arm64" : "x64"
-  const miniforgePkg = MINIFORGE.find((m) => m.platform === currentOS && m.arch === currentArch)
+  const miniforgePkg = MINIFORGE.find((m) => m.platform === targetOS && m.arch === targetArch)
   if (miniforgePkg) {
     await downloadFile(miniforgePkg.url, path.join(BUNDLE_DIR, "python", miniforgePkg.name))
   } else {
@@ -207,13 +259,14 @@ async function main() {
   // 6. Compress
   console.log("Compressing bundle...")
 
-  // Use tar for both platforms (Windows 10+ includes tar)
-  // -c: create, -z: gzip, -f: file, -C: change directory
-  // We compress the CONTENTS of BUNDLE_DIR
   try {
-    await $`tar -czf ${zipPath} -C ${BUNDLE_DIR} .`
+    if (targetOS === "win32") {
+      await $`cd ${BUNDLE_DIR} && zip -r ${zipPath} .`
+    } else {
+      await $`tar -czf ${zipPath} -C ${BUNDLE_DIR} .`
+    }
   } catch (error) {
-    console.error("Error using tar command. Ensure 'tar' is available in your PATH.")
+    console.error("Error compressing bundle.")
     throw error
   }
 
