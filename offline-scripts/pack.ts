@@ -19,15 +19,24 @@ let targetPlatform: string | null = null
 if (args.includes("--help") || args.includes("-h")) {
   console.log(`Usage: bun pack.ts [options]
 Options:
-  --target <platform>  Build for specific platform (e.g., darwin-arm64, linux-x64, win32-x64)
+  --target <platform>  Specify target platform
   --target all         Build for all platforms (default)
-  --help, -h           Show this help message
+  --help, -h          Show this help message
+
+Available platforms:
+  darwin-arm64        macOS ARM64
+  darwin-x64          macOS x64
+  linux-arm64         Linux ARM64
+  linux-x64           Linux x64
+  win32-x64           Windows x64
 
 Examples:
-  bun pack.ts                      # Build for current platform
-  bun pack.ts --target darwin-arm64 # Build for macOS ARM64
-  bun pack.ts --target linux-x64    # Build for Linux x64
-  bun pack.ts --target all          # Build for all platforms`)
+  bun pack.ts                      # Build for current platform (default)
+  bun pack.ts --target darwin-arm64 # Build for macOS ARM64 (includes all OpenCode binaries)
+  bun pack.ts --target linux-arm64  # Build for Linux ARM64 (includes all OpenCode binaries)
+  bun pack.ts --target linux-x64   # Build for Linux x64 (includes all OpenCode binaries)
+  bun pack.ts --target win32-x64   # Build for Windows x64 (includes all OpenCode binaries)
+  bun pack.ts --target all         # Build for all platforms (default behavior)`)
   process.exit(0)
 }
 
